@@ -6,6 +6,7 @@ import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.sql.Date;
 import java.sql.PreparedStatement;
+import java.sql.Statement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.DateFormat;
@@ -127,10 +128,20 @@ public class Home {
 		
 		winnerBtn.addActionListener(e -> {
 			new Winners();
+			
 		});
 
 		loadBtn.addActionListener(e -> {
-			loadCSV();
+			
+			if (loadCSV()){
+				JOptionPane.showMessageDialog(frame, "CSV File Loaded Successfully.");
+				frame.dispose();
+				new Home(null, false);
+			}else{
+				JOptionPane.showMessageDialog(frame, "CSV File Load Failed!");
+			}
+
+
 		});
 
 		sortBtn.addActionListener(e -> {
@@ -228,7 +239,7 @@ public class Home {
 		
 	}
 
-	public void loadCSV() {
+	public boolean loadCSV() {
 		System.out.println(Paths.get("sample.csv").toAbsolutePath().toString());
 		try (BufferedReader br = Files.newBufferedReader(Paths.get("sample.csv").toAbsolutePath())) {
 
@@ -237,7 +248,7 @@ public class Home {
 		
 			// read the file line by line
 			String line;
-			ArrayList<Object> multiList = new ArrayList<Object>();
+			ArrayList<String[]> multiList = new ArrayList<String[]>();
 			while ((line = br.readLine()) != null) {
 		
 				// convert line into columns
@@ -247,25 +258,38 @@ public class Home {
 				System.out.println(columns);
 				
 			}
+			multiList.remove(0);
 			System.out.println(multiList);
 
-			
-		
+			for (String[] list : multiList) {
+				addTicket(list);
+			}
+			return true;
 		} catch (IOException ex) {
 			ex.printStackTrace();
 		}
-
+		return false;
 	}
 
 	public boolean addTicket(String[] list) {
 		DBConnect conn = new DBConnect();
 		PreparedStatement stmt;
 		try {
-			stmt = (PreparedStatement) conn.connection().prepareStatement("insert into customers values (null, ?, ?, ?)");
-			stmt.setInt(1, Integer.parseInt(list[1]));
-			stmt.setString(1, list[3]);
-			stmt.setString(1, list[2]);
+			stmt = (PreparedStatement) conn.connection().prepareStatement("insert into customers values (null, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS);
+			stmt.setString(1, list[1]);
+			stmt.setString(2, list[3]);
+			stmt.setString(3, list[2]);
 			stmt.executeUpdate();
+
+			ResultSet rs = stmt.getGeneratedKeys();
+			if (rs.next()){
+				int customerId = rs.getInt(1);
+				System.out.println(customerId);
+				stmt = (PreparedStatement) conn.connection().prepareStatement("insert into tickets values (null, ?, ?)", Statement.RETURN_GENERATED_KEYS);
+				stmt.setString(1, list[0]);
+				stmt.setInt(2, customerId);
+				stmt.executeUpdate();
+			}
 			return true;	
 		} catch (SQLException e1) {
 			e1.printStackTrace();
